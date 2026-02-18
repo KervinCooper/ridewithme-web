@@ -1,12 +1,24 @@
 {
-  "short_name": "RideWithMe",
-  "name": "RideWithMe Tracking",
+  "short_name": "onthemuv",
+  "name": "onthemuv Transit Tracking",
+  "description": "Secure, real-time student and fleet logistics.",
   "icons": [
-    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192" },
-    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512" }
+    { 
+      "src": "icon-192.png", 
+      "type": "image/png", 
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    { 
+      "src": "icon-512.png", 
+      "type": "image/png", 
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait",
+  "theme_color": "#050505",
+  "background_color": "#050505"
 }
