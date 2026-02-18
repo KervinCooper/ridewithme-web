@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,14 +12,26 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Setting the theme color for the mobile browser address bar
+export const viewport: Viewport = {
+  themeColor: "#050505",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
-  title: "RideWithMe",
-  description: "Track school rides in real-time",
+  title: "onthemuv | Transit Tracking",
+  description: "Secure, real-time student and fleet logistics.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "RideWithMe",
+    statusBarStyle: "black-translucent",
+    title: "onthemuv",
+  },
+  icons: {
+    apple: "/icon-192x192.png", // Ensure this exists in your public folder
   },
 };
 
@@ -31,7 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#050505]`}
       >
         {children}
       </body>
