@@ -63,12 +63,12 @@ export default function AdminPage() {
   if (!isAdmin) {
     return (
       <div className="h-screen bg-[#050505] flex flex-col items-center justify-center p-6 text-white">
-        <h1 className="text-5xl font-black italic uppercase tracking-tighter mb-2 text-[#CCFF00]">Command</h1>
-        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-12">System Authorization Required</p>
+        <h1 className="text-5xl font-black italic uppercase tracking-tighter mb-2 text-[#CCFF00]">Fleet Management</h1>
+        <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-12">System Authorisation Required</p>
         <div className="w-full max-w-xs space-y-4">
           <input placeholder="ADMIN USER" className="bg-zinc-900 p-5 rounded-2xl w-full border-2 border-transparent focus:border-[#CCFF00] text-center font-bold outline-none uppercase" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} />
           <input type="password" placeholder="PIN" className="bg-zinc-900 p-5 rounded-2xl w-full border-2 border-transparent focus:border-[#CCFF00] text-center font-bold outline-none" value={adminPin} onChange={(e) => setAdminPin(e.target.value)} />
-          <button onClick={handleAdminLogin} className="bg-[#CCFF00] text-black p-5 rounded-2xl font-black uppercase italic w-full">Unlock Terminal</button>
+          <button onClick={handleAdminLogin} className="bg-[#CCFF00] text-black p-5 rounded-2xl font-black uppercase italic w-full">Log In</button>
         </div>
       </div>
     );
@@ -79,10 +79,10 @@ export default function AdminPage() {
       {/* HEADER */}
       <div className="flex justify-between items-center mb-10">
         <div>
-          <h1 className="text-3xl font-black italic uppercase tracking-tighter text-[#CCFF00]">Fleet Command</h1>
+          <h1 className="text-3xl font-black italic uppercase tracking-tighter text-[#CCFF00]">Fleet Management</h1>
           <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em]">on<span className="text-white">the</span>muv master control</p>
         </div>
-        <button onClick={() => { setIsAdmin(false); localStorage.removeItem('muv_admin_auth'); }} className="text-[9px] font-black uppercase bg-zinc-900 text-zinc-500 px-4 py-2 rounded-xl border border-zinc-800 hover:text-red-500 transition-colors">Terminate Session</button>
+        <button onClick={() => { setIsAdmin(false); localStorage.removeItem('muv_admin_auth'); }} className="text-[9px] font-black uppercase bg-zinc-900 text-zinc-500 px-4 py-2 rounded-xl border border-zinc-800 hover:text-red-500 transition-colors">Log Out</button>
       </div>
 
       {/* MASTER LIVE MAP */}
@@ -133,14 +133,14 @@ export default function AdminPage() {
             <button onClick={async () => {
                await supabase.from('students').insert([{ name: studentForm.name, parent_phone: studentForm.phone, vehicle_id: parseInt(studentForm.vehicleId), status: 'Not picked' }]);
                fetchData(); setStudentForm({ name: '', phone: '', vehicleId: '' });
-            }} className="w-full bg-[#CCFF00] text-black p-4 rounded-xl font-black uppercase italic shadow-[0_0_15px_rgba(204,255,0,0.1)]">Finalize Enrollment</button>
+            }} className="w-full bg-[#CCFF00] text-black p-4 rounded-xl font-black uppercase italic shadow-[0_0_15px_rgba(204,255,0,0.1)]">Finalise Enrollment</button>
           </div>
         </div>
       </div>
 
       {/* MANIFEST */}
       <div className="bg-zinc-900/30 p-8 rounded-[2.5rem] border border-zinc-800">
-        <h2 className="text-[10px] font-black uppercase mb-8 text-zinc-500 tracking-[0.3em] text-center">Operational Manifest</h2>
+        <h2 className="text-[10px] font-black uppercase mb-8 text-zinc-500 tracking-[0.3em] text-center">Live Updates</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {students.map(s => (
             <div key={s.id} className="p-6 rounded-[2rem] border border-zinc-800 bg-zinc-900/50 hover:border-[#CCFF00]/50 transition-all group">

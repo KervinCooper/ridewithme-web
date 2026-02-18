@@ -1,58 +1,65 @@
 "use client";
-
+import { useEffect, useState } from 'react';
 import Link from "next/link";
 
 export default function Home() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showiOSGuide, setShowiOSGuide] = useState(false);
+
+  useEffect(() => {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
+  }, []);
+
+  const handleEntry = async (path: string) => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+    if (isIOS && !isStandalone) {
+      setShowiOSGuide(true);
+    } else if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+      window.location.href = path;
+    } else {
+      window.location.href = path;
+    }
+  };
+
   return (
-    <div className="h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-8 text-center">
-      {/* Brand Header */}
-      <div className="relative group">
-        <h1 className="text-7xl font-black italic uppercase tracking-tighter leading-none">
+    <div className="h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-center">
+      <div className="relative mb-2">
+        <h1 className="text-7xl font-black italic uppercase tracking-tighter">
           on<span className="text-[#CCFF00]">the</span>muv
         </h1>
-        <div className="absolute -top-4 -right-2 bg-[#CCFF00] text-black text-[10px] px-2 py-0.5 font-bold italic rounded-sm transform rotate-12">
-          PRO
+        <span className="absolute -top-4 -right-4 bg-white text-black text-[8px] px-2 py-1 font-black rounded-full italic">LIVE</span>
+      </div>
+      <p className="text-zinc-500 font-bold uppercase tracking-[0.4em] text-[10px] mb-16">Smart Transit Systems</p>
+
+      <div className="w-full max-w-sm space-y-4">
+        <button onClick={() => handleEntry('/parent')} className="w-full bg-zinc-900 border border-zinc-800 p-6 rounded-[2.5rem] text-left hover:border-[#CCFF00]/40 transition-all">
+          <p className="text-[#CCFF00] text-[10px] font-black uppercase tracking-widest mb-1 font-sans">Parent Secure Access</p>
+          <p className="text-2xl font-black italic uppercase">Parent Portal</p>
+        </button>
+
+        <button onClick={() => handleEntry('/driver')} className="w-full bg-zinc-950 border border-zinc-900 p-6 rounded-[2.5rem] text-left opacity-80">
+          <p className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-1 font-sans">Driver Secure Access</p>
+          <p className="text-2xl font-black italic uppercase">Driver Portal</p>
+        </button>
+      </div>
+
+      {showiOSGuide && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[5000] flex flex-col items-center justify-center p-10">
+          <div className="max-w-xs text-center">
+            <h2 className="text-[#CCFF00] text-2xl font-black italic uppercase mb-4">Install App</h2>
+            <p className="text-zinc-400 text-sm mb-8">Tap the <span className="text-white font-bold">Share Button</span> then <span className="text-white font-bold">"Add to Home Screen"</span> to enable live tracking.</p>
+            <button onClick={() => setShowiOSGuide(false)} className="bg-white text-black w-full py-4 rounded-2xl font-black uppercase italic text-xs">I understand</button>
+          </div>
         </div>
-      </div>
-      
-      <p className="mt-4 text-zinc-500 font-bold uppercase tracking-[0.4em] text-[10px]">
-        Smart Transit Systems
-      </p>
-
-      {/* Access Portal */}
-      <div className="mt-16 w-full max-w-sm space-y-4">
-        <Link 
-          href="/parent" 
-          className="group block w-full bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] transition-all hover:border-[#CCFF00]/50"
-        >
-          <p className="text-[#CCFF00] text-[10px] font-black uppercase tracking-widest mb-1">Secure Tracking</p>
-          <p className="text-2xl font-black italic uppercase group-hover:translate-x-1 transition-transform">Parent Portal</p>
-        </Link>
-
-        <Link 
-          href="/driver" 
-          className="group block w-full bg-zinc-950 border border-zinc-900 p-6 rounded-[2rem] transition-all hover:bg-zinc-900"
-        >
-          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-1">Fleet Access</p>
-          <p className="text-2xl font-black italic uppercase opacity-80 group-hover:opacity-100 transition-opacity">Driver Entry</p>
-        </Link>
-      </div>
-
-      {/* Security Disclaimer */}
-      <div className="mt-12 max-w-[280px]">
-        <p className="text-zinc-600 text-[11px] leading-relaxed">
-          Authorized access only. By entering, you agree to real-time location protocols for student safety.
-        </p>
-      </div>
-
-      {/* Footer Branding */}
-      <div className="mt-auto pt-12 flex items-center gap-4 text-[9px] font-bold text-zinc-700 uppercase tracking-widest">
-        <span>Privacy</span>
-        <div className="w-1 h-1 bg-zinc-800 rounded-full" />
-        <span>Terms</span>
-        <div className="w-1 h-1 bg-zinc-800 rounded-full" />
-        <span className="text-zinc-500 underline underline-offset-4">ZanoSamu Digital Studios</span>
-      </div>
+      )}
     </div>
   );
 }
