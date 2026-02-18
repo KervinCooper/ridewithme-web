@@ -23,4 +23,37 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Changed from hidden to auto so your Driver list can actually scroll */
+  overflow-y: auto; 
+}
+
+/* --- LEAFLET MAP FIXES --- */
+
+/* Ensure the map container fills its parent */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  /* Critical for OpenStreetMap tile alignment */
+  outline: none;
+}
+
+/* Fix for Next.js image conflicts with Leaflet markers */
+.leaflet-marker-icon {
+  background: none;
+  border: none;
+}
+
+/* Fix for the "puzzled" or broken tile look */
+.leaflet-tile-pane {
+  -webkit-filter: brightness(1);
+  filter: brightness(1);
+}
+
+/* Container for the Viewport */
+.map-viewport {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
 }
