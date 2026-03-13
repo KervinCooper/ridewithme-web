@@ -123,7 +123,7 @@ export default function AdminPage() {
 
           {/* Students Panel */}
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] flex-1">
-            <h2 className="text-[#CCFF00] text-sm font-black uppercase italic mb-4">Passenger Manifest</h2>
+            <h2 className="text-[#CCFF00] text-sm font-black uppercase italic mb-4">Live Trip List</h2>
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
               {students.map(s => (
                 <div key={s.id} className="flex justify-between items-center bg-zinc-950 p-4 rounded-xl border border-zinc-800/50">

@@ -196,7 +196,7 @@ export default function DriverPage() {
                     </button>
                   )}
                   <button onClick={() => updateStatus(s.id, 'Picked Up', s.name)} className="w-full bg-[#CCFF00] text-black py-6 rounded-2xl font-black text-xl uppercase active:scale-95 transition-transform shadow-md">
-                    PICK UP PASSENGER
+                    PICK UP Student
                   </button>
                 </>
               )}
