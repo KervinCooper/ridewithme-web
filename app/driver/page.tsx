@@ -63,7 +63,7 @@ export default function DriverPage() {
       localStorage.setItem('muv_driver_reg', reg.toUpperCase().trim());
       localStorage.setItem('muv_driver_pin', pin.trim());
     } else { 
-      alert("Login Failed."); 
+      alert("Login Failed. Check Registration and PIN."); 
     }
     setLoading(false);
   };
@@ -109,6 +109,25 @@ export default function DriverPage() {
     }
   };
 
+  // Bulk reset for the next morning
+  const resetManifest = async () => {
+    if (!confirm("Are you starting a new shift? This will reset all passengers to 'WAITING'.")) return;
+    
+    const { error } = await supabase
+      .from('students')
+      .update({ status: 'WAITING FOR PICKUP' })
+      .eq('vehicle_id', vehicle.id);
+
+    if (!error) {
+      fetchManifest();
+      setToast("Route reset for new shift.");
+      setTimeout(() => setToast(""), 4000);
+    } else {
+      alert("Failed to reset route: " + error.message);
+    }
+  };
+
+  // Dynamic Tailwind Classes based on Day/Night Mode
   const pageBg = isDayMode ? "bg-zinc-100 text-black" : "bg-[#050505] text-white";
   const cardBg = isDayMode ? "bg-white border-zinc-300 shadow-sm" : "bg-zinc-900 border-zinc-700";
   const inputBg = isDayMode ? "bg-white border-zinc-300 text-black placeholder-zinc-400" : "bg-zinc-900 border-transparent text-white";
@@ -176,6 +195,15 @@ export default function DriverPage() {
       </div>
 
       <div className="space-y-4">
+        
+        {/* Bulk Reset Button */}
+        <button 
+          onClick={resetManifest} 
+          className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform border mb-4 ${isDayMode ? 'bg-zinc-200 border-zinc-300 text-black' : 'bg-zinc-800 border-zinc-700 text-zinc-300'}`}
+        >
+          🔄 START NEW SHIFT (RESET ROUTE)
+        </button>
+
         {students.map(s => (
           <div key={s.id} className={`p-6 border rounded-[2rem] flex flex-col gap-4 transition-colors ${cardBg}`}>
             <div>
@@ -189,14 +217,13 @@ export default function DriverPage() {
               {/* If they are not picked up or dropped, show the action buttons */}
               {s.status !== 'Picked Up' && s.status !== 'Dropped' && (
                 <>
-                  {/* Hide 5 min warning if it's already sent */}
                   {s.status !== 'Arriving in 5 mins' && (
                     <button onClick={() => updateStatus(s.id, 'Arriving in 5 mins', s.name)} className={`w-full py-4 rounded-2xl font-black text-sm uppercase active:scale-95 transition-transform border ${warningBtnBg}`}>
                       🔔 Send 5 Min Warning
                     </button>
                   )}
-                  <button onClick={() => updateStatus(s.id, 'Picked Up', s.name)} className="w-full bg-[#CCFF00] text-black py-6 rounded-2xl font-black text-xl uppercase active:scale-95 transition-transform shadow-md">
-                    PICK UP Student
+                  <button onClick={() => updateStatus(s.id, 'Picked Up', s.name)} className="w-full bg-[#CCFF00] text-black py-6 rounded-2xl font-black text-xl uppercase active:scale-95 transition-transform shadow-md mt-2">
+                    PICK UP PASSENGER
                   </button>
                 </>
               )}
@@ -205,6 +232,13 @@ export default function DriverPage() {
               {s.status === 'Picked Up' && (
                 <button onClick={() => updateStatus(s.id, 'Dropped', s.name)} className={`w-full py-6 rounded-2xl font-black text-xl uppercase active:scale-95 transition-transform border ${dropBtnBg}`}>
                   DROP OFF
+                </button>
+              )}
+
+              {/* Individual Reset just in case they accidentally dropped off the wrong kid */}
+              {s.status === 'Dropped' && (
+                <button onClick={() => updateStatus(s.id, 'WAITING FOR PICKUP', s.name)} className="w-full py-4 rounded-2xl font-black text-xs uppercase active:scale-95 transition-transform border border-zinc-700 text-zinc-500 bg-transparent hover:border-[#CCFF00] hover:text-[#CCFF00]">
+                  ↺ UNDO DROP OFF
                 </button>
               )}
             </div>
