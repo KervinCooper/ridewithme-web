@@ -2,12 +2,10 @@
 
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { IconButton } from "@/components/ui/IconButton";
 import { useIsClient } from "@/hooks/useIsClient";
 
-export interface ModalProps {
+export interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
   title?: string;
@@ -15,7 +13,13 @@ export interface ModalProps {
   className?: string;
 }
 
-export function Modal({ open, onClose, title, children, className }: ModalProps) {
+export function BottomSheet({
+  open,
+  onClose,
+  title,
+  children,
+  className,
+}: BottomSheetProps) {
   const mounted = useIsClient();
 
   useEffect(() => {
@@ -31,7 +35,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-end bg-black/70 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -41,15 +45,13 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-[0_8px_24px_rgba(0,0,0,0.4)]",
+          "w-full rounded-t-xl border-t border-border bg-surface p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.4)]",
           className
         )}
       >
+        <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-border" aria-hidden="true" />
         {title && (
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold uppercase italic text-text">{title}</h2>
-            <IconButton icon={<X className="h-4 w-4" />} label="Close" onClick={onClose} />
-          </div>
+          <h2 className="mb-4 text-lg font-bold uppercase italic text-text">{title}</h2>
         )}
         {children}
       </div>
