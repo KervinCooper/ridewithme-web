@@ -1,4 +1,4 @@
-import { supabase } from "@/services/supabaseClient";
+import { supabase } from "@/lib/supabase/client";
 
 export async function getUserRole() {
   const { data: { user } } = await supabase.auth.getUser();

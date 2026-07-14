@@ -1,4 +1,4 @@
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 
 export default function TestPage() {

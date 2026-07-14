@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/services/supabaseClient';
+import { supabase } from '@/lib/supabase/client';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
 
@@ -90,7 +90,7 @@ export default function AdminPage() {
   const addStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sName || !sPhone || !sVehicleId) return alert("Please fill all learner fields and select a vehicle.");
-    const { error } = await supabase.from('students').insert([{ name: sName, parent_phone: sPhone, vehicle_id: sVehicleId, status: 'WAITING FOR PICKUP' }]);
+    const { error } = await supabase.from('students').insert([{ name: sName, parent_phone: sPhone, vehicle_id: Number(sVehicleId), status: 'WAITING FOR PICKUP' }]);
     if (error) {
       alert("Error adding learner: " + error.message);
     } else {

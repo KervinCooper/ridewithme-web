@@ -2,7 +2,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { supabase } from '@/services/supabaseClient';
+import { supabase } from '@/lib/supabase/client';
 import 'leaflet/dist/leaflet.css';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });

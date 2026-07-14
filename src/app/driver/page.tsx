@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/services/supabaseClient';
+import { supabase } from '@/lib/supabase/client';
 
 export default function DriverPage() {
   const [vehicle, setVehicle] = useState<any>(null);
