@@ -1,9 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { RoleGuard } from '../../components/RoleGuard';
+import { LOCATION_TASK_NAME, setActiveVehicleId } from '../../lib/locationTask';
+import { enqueue, startOfflineQueueListener } from '../../lib/offlineQueue';
 import { supabase } from '../../lib/supabase/client';
 import { useSessionStore } from '../../stores/session.store';
 import type { Student, Vehicle } from '../../types/domain';
@@ -105,61 +108,95 @@ function DriverScreen() {
     if (vehicle) fetchManifest();
   }, [vehicle, fetchManifest]);
 
-  // Throttled vs. the old web geolocation.watchPosition (which had no interval controls) —
-  // reasonable default so this doesn't hammer the rides upsert every GPS tick.
   useEffect(() => {
-    if (!isLive || !vehicle) return;
+    const subscription = startOfflineQueueListener(fetchManifest);
+    return () => subscription.remove();
+  }, [fetchManifest]);
 
-    let subscription: Location.LocationSubscription | null = null;
-    let cancelled = false;
+  // GO LIVE starts the background task (lib/locationTask.ts) rather than a foreground-only
+  // watch — one code path that keeps updating whether the app is foregrounded or not, instead
+  // of a parallel foreground implementation to maintain alongside it.
+  useEffect(() => {
+    if (!vehicle) return;
 
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        if (!cancelled) {
+    if (isLive) {
+      (async () => {
+        const fg = await Location.requestForegroundPermissionsAsync();
+        if (fg.status !== 'granted') {
           Alert.alert('Location permission needed', 'Enable location access to go live.');
           setIsLive(false);
+          return;
         }
-        return;
-      }
-      subscription = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
-        async (pos) => {
-          await supabase.from('rides').upsert(
-            {
-              vehicle_id: vehicle.id,
-              current_lat: pos.coords.latitude,
-              current_lng: pos.coords.longitude,
-              speed: pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'vehicle_id' },
+        const bg = await Location.requestBackgroundPermissionsAsync();
+        if (bg.status !== 'granted') {
+          Alert.alert(
+            'Background location needed',
+            'Allow "Always" location access so tracking continues while the app is backgrounded.',
           );
-        },
-      );
-    })();
-
-    return () => {
-      cancelled = true;
-      subscription?.remove();
-    };
+          setIsLive(false);
+          return;
+        }
+        await setActiveVehicleId(vehicle.id);
+        await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 3000,
+          distanceInterval: 5,
+          foregroundService: {
+            notificationTitle: 'onthemuv is tracking this trip',
+            notificationBody: `${vehicle.plateNumber} — tap to return to the app`,
+          },
+        });
+      })();
+    } else {
+      Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).then((started) => {
+        if (started) Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+      });
+      setActiveVehicleId(null);
+    }
   }, [isLive, vehicle]);
-
-  async function toggleSOS() {
-    if (!vehicle) return;
-    const newStatus = sosActive ? 'ACTIVE' : 'SOS';
-    const { error } = await supabase.from('vehicles').update({ status: newStatus }).eq('id', vehicle.id);
-    if (!error) setSosActive(!sosActive);
-  }
 
   function showToast(message: string) {
     setToast(message);
     setTimeout(() => setToast(''), 4000);
   }
 
+  // Only treats a failure as "offline, queue it" when the device is actually
+  // disconnected — a real error (bad data, RLS) still surfaces immediately
+  // rather than being silently swallowed into the queue forever.
+  async function isOffline() {
+    const state = await Network.getNetworkStateAsync();
+    return !state.isConnected;
+  }
+
+  async function toggleSOS() {
+    if (!vehicle) return;
+    const newStatus = sosActive ? 'ACTIVE' : 'SOS';
+    const { error } = await supabase.from('vehicles').update({ status: newStatus }).eq('id', vehicle.id);
+    if (error) {
+      if (await isOffline()) {
+        await enqueue({ type: 'vehicleStatus', vehicleId: vehicle.id, status: newStatus });
+        setSosActive(!sosActive);
+        showToast('Saved locally — will sync when back online.');
+      } else {
+        Alert.alert('Failed to update SOS', error.message);
+      }
+      return;
+    }
+    setSosActive(!sosActive);
+  }
+
   async function updateStatus(id: number, status: string, name: string) {
     const { error } = await supabase.from('students').update({ status }).eq('id', id);
-    if (error) return;
+    if (error) {
+      if (await isOffline()) {
+        setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+        await enqueue({ type: 'studentStatus', studentId: id, status });
+        showToast('Saved locally — will sync when back online.');
+      } else {
+        Alert.alert('Failed to update status', error.message);
+      }
+      return;
+    }
     fetchManifest();
     if (status === 'Dropped') {
       showToast(`Marked ${name} as dropped off.`);
@@ -184,7 +221,13 @@ function DriverScreen() {
               .update({ status: 'WAITING FOR PICKUP' })
               .eq('vehicle_id', vehicle.id);
             if (error) {
-              Alert.alert('Failed to reset route', error.message);
+              if (await isOffline()) {
+                setStudents((prev) => prev.map((s) => ({ ...s, status: 'WAITING FOR PICKUP' })));
+                await enqueue({ type: 'bulkReset', vehicleId: vehicle.id });
+                showToast('Saved locally — will sync when back online.');
+              } else {
+                Alert.alert('Failed to reset route', error.message);
+              }
               return;
             }
             fetchManifest();

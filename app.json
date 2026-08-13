@@ -29,7 +29,11 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "onthemuv uses your location while GO LIVE is on so parents and admin can see this vehicle move."
+          "locationWhenInUsePermission": "onthemuv uses your location while GO LIVE is on so parents and admin can see this vehicle move.",
+          "locationAlwaysAndWhenInUsePermission": "onthemuv uses your location, including while the app is in the background, so parents and admin can keep seeing this vehicle move during a live trip.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ]
     ]

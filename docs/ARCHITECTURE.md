@@ -30,7 +30,7 @@ Three concrete gaps drove the decision to restart on Expo/React Native:
 | Session storage | `expo-secure-store` (see note in `lib/supabase/secureStoreAdapter.ts` re: its ~2048-byte value cap) |
 | Client state | Zustand |
 | Maps | react-native-maps (native Google/Apple maps), replacing Leaflet |
-| Location | expo-location (foreground tracking shipped in Phase 3) + expo-task-manager for background updates, added in Phase 4 (requires an EAS dev build — Expo Go can't run a custom background task) |
+| Location | expo-location + expo-task-manager (`lib/locationTask.ts`) — background tracking shipped in Phase 4, replacing Phase 3's foreground-only watch. Requires an EAS dev build to actually run (Expo Go can't load a custom background task) |
 | Push | expo-notifications + Expo Push API, triggered by a Supabase Database Webhook / Edge Function |
 
 ## Auth & data model
@@ -170,11 +170,51 @@ create the driver/parent account and link it to a vehicle/student.
   is now honest about being a local status change; the old offline banner
   ("...Saving Data Locally", also no such queueing existed) isn't ported at
   all, deferred to Phase 4 where real offline write-queueing actually belongs.
-- **Phase 4** — Background location survival (EAS dev build) for the GO LIVE
-  flow Phase 3 already built, plus real offline write-queueing.
-- **Phase 5** — Parent: live map, realtime subscription (fixing the known
-  join-drop bug from `BEHAVIOR.md`'s parent realtime handler #2 intentionally
-  this time, not silently).
+- **Phase 4 (done, code+config only — see "Building a dev client" below)** —
+  GO LIVE now uses `Location.startLocationUpdatesAsync`/`stopLocationUpdatesAsync`
+  with the background task defined in `lib/locationTask.ts` (registered once
+  at `app/_layout.tsx` import time — `TaskManager` requires the definition to
+  exist before any start call, including after a cold start with a session
+  still active). Requests `requestBackgroundPermissionsAsync()` in addition to
+  Phase 3's foreground permission. This one path replaces Phase 3's
+  `watchPositionAsync` entirely — no parallel foreground/background
+  implementations. `app.json`'s `expo-location` plugin config now sets
+  `isIosBackgroundLocationEnabled`, `isAndroidBackgroundLocationEnabled`, and
+  `isAndroidForegroundServiceEnabled` (Android 8+ requires a foreground
+  service + persistent notification for background location — the plugin
+  generates it). New `eas.json` with a `development` build profile.
+  Real **offline write-queue** (`lib/offlineQueue.ts`) scoped to
+  status-changing mutations only (student status, SOS toggle, bulk reset) —
+  deliberately *not* the location stream, which self-heals on the next GPS
+  tick with nothing worth persisting. AsyncStorage-backed FIFO of plain JSON
+  mutation descriptors, flushed in order on reconnect
+  (`expo-network`'s `addNetworkStateListener`). Only queues on a *confirmed*
+  network failure (`Network.getNetworkStateAsync()`), not on genuine
+  errors (bad data, RLS) — those still surface as a hard `Alert`. This is
+  what the old app's "Saving Data Locally" banner text claimed to do and
+  didn't (`docs/BEHAVIOR.md` flagged the lie) — now real.
+- **Phase 5 (done)** — Parent screen (`app/parent/index.tsx`, resolves the
+  child via `students.parent_id = auth.uid()` — same pattern as Phase 3's
+  driver/vehicle resolution). Realtime subscribes to `rides`/`students`/
+  `vehicles` and **refetches the full joined record on any event** rather
+  than patching state from the payload — the fix `docs/BEHAVIOR.md` asked
+  for: the old app's handler #2 did `setStudent(payload.new)` on a raw
+  `students` `UPDATE`, which has no `vehicles` join data and blanked the
+  header/SOS check until a third handler patched it back. Same
+  refetch-over-patch pattern as Phase 2's admin map. Map, 5-minute-warning/
+  SOS/vehicle-offline overlays, and header chip all ported with the app's own
+  tokens instead of the old one-off `#CCFF00` literals.
+
+**Building a dev client (Phase 4, on your end — not done here):** no
+device/simulator in this environment, and a custom dev client needs a real
+EAS account + build + install regardless of who wrote the config. Run
+`eas build --profile development --platform android` (or `ios`), install the
+result on a phone, then `npx expo start --dev-client`. Test background
+survival by going live and backgrounding the app; test the offline queue by
+toggling airplane mode mid-shift. Also flagging for **Phase 7**, not solving
+now: iOS App Store review for "Always" location access is stricter than
+"When in Use" and typically wants a clear in-app justification shown before
+the permission prompt.
 - **Phase 6** — Real push notifications (SOS, 5-minute warning, admin SOS alert).
 - **Phase 7** — EAS build config, store metadata.
 

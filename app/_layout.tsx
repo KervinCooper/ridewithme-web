@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import '../lib/locationTask'; // registers the background task — must run before any GO LIVE
 import { supabase } from '../lib/supabase/client';
 import { useSessionStore } from '../stores/session.store';
 
