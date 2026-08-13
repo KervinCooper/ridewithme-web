@@ -64,13 +64,21 @@ the live project:
   `raw_user_meta_data->>'role'`. No-op today since nothing creates `auth.users` rows yet
   (Phase 2's admin-driven account creation is what will start using this).
 - `vehicles.driver_id` (new, nullable) and `students.parent_id` (existing, FK added) —
-  both `references auth.users(id)`, both null until Phase 2 links them.
+  both `references auth.users(id)`, both null until an admin links them via `/admin/accounts`
+  (Phase 2).
 
 Accounts are **admin-created only** — no public self-signup. Drivers/parents/admin all get
 email/password accounts (avoids a day-one Twilio/SMS-provider dependency for parents; phone-OTP
-can be swapped in later via Supabase Auth without a schema change). The account-creation flow
-itself (an Edge Function using the service-role Admin API, plus an admin screen to trigger it) is
-Phase 2 scope, alongside the rest of the admin CRUD screens.
+can be swapped in later via Supabase Auth without a schema change). The admin types the account's
+initial password directly in the form — no invite-email flow, matches the same low-tech
+onboarding model as everything else admin-driven.
+
+**New-app-only data (Phase 2 decision):** vehicles/students created through the new admin CRUD
+don't populate `vehicles.pin` (left on its `'1234'` DB default, harmless) or
+`students.parent_phone` (left null) — those only exist for the *old* app's login flows, and the
+new app doesn't use them. This means a vehicle/student created via the new app won't be usable
+through the old app's PIN/phone-lookup login. Accepted tradeoff per the user — the old app is
+expected to stop being the source of new records going forward.
 
 **Bootstrap (manual, one-time):** the first admin account isn't created by app code. Create it via
 Supabase Dashboard → Authentication → Add User (email + password), then run
@@ -85,6 +93,24 @@ account exists yet.
 `students` / `rides`, and dropping the `admins` table + `vehicles.pin` column, only happens once
 the old app is fully retired. Doing it now would break the live app's anon-key access immediately.
 
+## Edge Functions
+
+`supabase/functions/` — deployed via `npx supabase functions deploy <name>` (works without
+Docker, despite a "Docker is not running" warning — that warning is only about local `functions
+serve`/bundling cache, not the actual deploy). Functions use the `@supabase/server` package's
+`withSupabase(options, handler)` helper (scaffolded automatically by
+`npx supabase functions new <name>`), which hands the handler a `ctx` with:
+
+- `ctx.supabase` — RLS-scoped client for the calling user (or anon, depending on auth mode).
+- `ctx.supabaseAdmin` — service-role client, bypasses RLS. `SUPABASE_SERVICE_ROLE_KEY` is
+  auto-injected into every deployed function's environment — never has to be passed/stored
+  manually.
+- `ctx.userClaims?.id` — the calling user's id, when `auth: 'user'` mode requires a real JWT.
+
+`create-account` (Phase 2) is the first one: `auth: 'user'`, checks the caller's own `profiles`
+row via `ctx.supabase` (admin-only), then uses `ctx.supabaseAdmin.auth.admin.createUser(...)` to
+create the driver/parent account and link it to a vehicle/student.
+
 ## Route structure
 
 `app/` uses expo-router file-based routing:
@@ -96,6 +122,15 @@ the old app is fully retired. Doing it now would break the live app's anon-key a
   (**not** route groups — a route group folder's name is invisible in the
   URL, so three groups all containing `index.tsx` would each resolve to `/`
   and collide; plain folders give each role its own path segment)
+- `app/admin/index.tsx` (Fleet Command map+alerts), `app/admin/vehicles.tsx`,
+  `app/admin/students.tsx`, `app/admin/accounts.tsx` — real routes rather than
+  a `Tabs` navigator (avoids pulling in `@react-navigation/bottom-tabs` for a
+  4-screen section), linked by `components/admin/AdminNav.tsx`.
+- All role screens are wrapped in `components/RoleGuard.tsx`, which checks
+  both "signed in" and "signed in as *this* role" — redirects to `/login`
+  otherwise. (Phase 1's guard only checked "signed in," which was fine when
+  `/admin` was a placeholder; tightened in Phase 2 once it became real CRUD +
+  account creation.)
 
 ## Phase status
 
@@ -107,11 +142,18 @@ the old app is fully retired. Doing it now would break the live app's anon-key a
   sign-in screen, session store driven by `onAuthStateChange`, role-based
   redirect, per-role sign-out. See "Auth & data model" above for the live-DB
   details and what's deliberately still deferred (RLS cutover on the old
-  tables, dropping `admins`/`pin`). Still no admin/driver/parent account
-  creation UI (Phase 2), no vehicle/student data screens yet.
-- **Phase 2** — Admin: live map, vehicle/student CRUD, alerts panel, and the
-  admin-driven account-creation Edge Function + screen (create a driver/parent
-  auth account, link to a vehicle/student).
+  tables, dropping `admins`/`pin`).
+- **Phase 2 (done)** — Fleet Command live map (`react-native-maps`, realtime
+  via `postgres_changes` on `rides`/`vehicles`/`students`, refetch-on-any-event
+  rather than payload-patching — see "Auth & data model" and the Edge
+  Functions section), alerts panel (SOS > speeding > clear, 80km/h threshold),
+  live route panel, vehicle/student CRUD, and the `create-account` Edge
+  Function + `/admin/accounts` screen. Role guards tightened
+  (`components/RoleGuard.tsx`). Android map tiles need a Google Maps API key —
+  deliberately not configured yet (no `app.json` `android.config.googleMaps`
+  entry); add one (Google Cloud Console → enable Maps SDK for Android →
+  generate key) whenever Android map testing starts. iOS uses Apple Maps, no
+  key needed.
 - **Phase 3** — Driver: manifest, status actions, SOS.
 - **Phase 4** — Background location wired to the `rides` upsert (EAS dev build).
 - **Phase 5** — Parent: live map, realtime subscription (fixing the known
