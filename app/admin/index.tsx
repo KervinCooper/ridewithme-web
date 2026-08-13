@@ -1,10 +1,15 @@
-import { router } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
+import { supabase } from '../../lib/supabase/client';
 import { useSessionStore } from '../../stores/session.store';
 
 export default function AdminPlaceholder() {
-  const setRole = useSessionStore((s) => s.setRole);
+  const status = useSessionStore((s) => s.status);
+
+  if (status !== 'signedIn') {
+    return <Redirect href="/login" />;
+  }
 
   return (
     <View className="flex-1 items-center justify-center gap-4 bg-bg px-6">
@@ -13,13 +18,10 @@ export default function AdminPlaceholder() {
         Placeholder — live map, vehicle/student CRUD land in Phase 2.
       </Text>
       <Pressable
-        onPress={() => {
-          setRole(null);
-          router.replace('/');
-        }}
+        onPress={() => supabase.auth.signOut()}
         className="mt-6 rounded-lg border border-border px-5 py-3 active:opacity-70"
       >
-        <Text className="text-text-muted">← Back to landing</Text>
+        <Text className="text-text-muted">Sign out</Text>
       </Pressable>
     </View>
   );

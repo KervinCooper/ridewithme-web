@@ -33,21 +33,57 @@ Three concrete gaps drove the decision to restart on Expo/React Native:
 | Location | expo-location + expo-task-manager for background updates (requires an EAS dev build — Expo Go can't run a custom background task) |
 | Push | expo-notifications + Expo Push API, triggered by a Supabase Database Webhook / Edge Function |
 
-## Auth & data model (target — implemented in Phase 1)
+## Auth & data model
 
-Supabase Auth replaces the plaintext-PIN `admins`/`vehicles.pin` pattern:
+**The Supabase project (`tmkazgmbvqehihkxtcbd`) is live** — the old Next.js/Capacitor app still
+runs against it in production with real drivers/parents/vehicles/students. Every migration in
+this rebuild has to be additive until the old app is retired; see "Cutover (not done yet)" below
+for what's deliberately deferred.
 
-- `profiles(id uuid references auth.users, role text check in ('admin','driver','parent'))`
-- `vehicles.driver_user_id uuid references auth.users` — replaces PIN-based driver login
-- `students.parent_user_id uuid references auth.users` — replaces phone-number-only parent lookup
-- RLS: drivers see/update only their own vehicle + its students; parents see only their
-  linked student; admin sees all rows (checked via `profiles.role = 'admin'`)
-- `admins` table and `vehicles.pin` column are dropped once the migration ships
+Live schema audited directly (`supabase db query --linked`) before writing the Phase 1 migration,
+since `docs/BEHAVIOR.md`'s schema notes had drifted from reality:
 
-Drivers and admin get email/password accounts (small, fixed staff list — no SMS
-provider needed). Parents also start on email/password to avoid a day-one
-Twilio/SMS-provider dependency; phone-OTP can be swapped in later via
-Supabase Auth without a schema change.
+- `profiles(id uuid, first_name, last_name, role text default 'parent')` already existed, with
+  RLS enabled but **zero policies** (i.e. already fully locked/deny-all — safe to build on).
+- `vehicles`, `students`, `rides`, `admins` all have RLS "enabled" too, but each has at least one
+  permissive `qual: true` policy for the `public` role — that's what makes the old app's
+  anon-key-only access work today. **Not touched.**
+- `students.parent_id uuid` already existed (unused, no FK) — reused instead of adding a
+  redundant `parent_user_id` column.
+- `vehicles` had no driver-link column, so `driver_id uuid` was added (naming matches
+  `students.parent_id`).
+
+Phase 1 migration (`supabase/migrations/20260813124519_profiles_and_role_links.sql`), applied to
+the live project:
+
+- `profiles`: added PK + `references auth.users(id)` FK, a
+  `role in ('admin','driver','parent')` check constraint, and three RLS policies
+  (`profiles_select_own`, `profiles_select_admin` via a `security definer` `current_role()`
+  helper to avoid self-referential recursion, `profiles_update_own`).
+- `handle_new_user()` trigger on `auth.users` insert → auto-creates the `profiles` row from
+  `raw_user_meta_data->>'role'`. No-op today since nothing creates `auth.users` rows yet
+  (Phase 2's admin-driven account creation is what will start using this).
+- `vehicles.driver_id` (new, nullable) and `students.parent_id` (existing, FK added) —
+  both `references auth.users(id)`, both null until Phase 2 links them.
+
+Accounts are **admin-created only** — no public self-signup. Drivers/parents/admin all get
+email/password accounts (avoids a day-one Twilio/SMS-provider dependency for parents; phone-OTP
+can be swapped in later via Supabase Auth without a schema change). The account-creation flow
+itself (an Edge Function using the service-role Admin API, plus an admin screen to trigger it) is
+Phase 2 scope, alongside the rest of the admin CRUD screens.
+
+**Bootstrap (manual, one-time):** the first admin account isn't created by app code. Create it via
+Supabase Dashboard → Authentication → Add User (email + password), then run
+`update public.profiles set role = 'admin' where id = '<uuid from the dashboard>';` — the
+`handle_new_user` trigger already created the empty profile row.
+
+Two test accounts (`role = 'driver'`, `role = 'parent'`) already existed in `auth.users`/`profiles`
+before this migration — created outside this rebuild, presumably while prototyping. No admin
+account exists yet.
+
+**Cutover (not done yet, deliberately deferred):** enabling RLS lockdown on `vehicles` /
+`students` / `rides`, and dropping the `admins` table + `vehicles.pin` column, only happens once
+the old app is fully retired. Doing it now would break the live app's anon-key access immediately.
 
 ## Route structure
 
@@ -66,9 +102,16 @@ Supabase Auth without a schema change.
 - **Phase 0 (done)** — project scaffold, NativeWind theme, route skeleton
   with placeholder screens, Supabase client + domain types + session store
   stub. No real auth, data, or maps yet.
-- **Phase 1** — Supabase schema migration (profiles, RLS, drop admins/pin),
-  Supabase Auth screens.
-- **Phase 2** — Admin: live map, vehicle/student CRUD, alerts panel.
+- **Phase 1 (done)** — additive schema migration (`profiles` hardened + RLS,
+  `vehicles.driver_id` / `students.parent_id` role links), real Supabase Auth
+  sign-in screen, session store driven by `onAuthStateChange`, role-based
+  redirect, per-role sign-out. See "Auth & data model" above for the live-DB
+  details and what's deliberately still deferred (RLS cutover on the old
+  tables, dropping `admins`/`pin`). Still no admin/driver/parent account
+  creation UI (Phase 2), no vehicle/student data screens yet.
+- **Phase 2** — Admin: live map, vehicle/student CRUD, alerts panel, and the
+  admin-driven account-creation Edge Function + screen (create a driver/parent
+  auth account, link to a vehicle/student).
 - **Phase 3** — Driver: manifest, status actions, SOS.
 - **Phase 4** — Background location wired to the `rides` upsert (EAS dev build).
 - **Phase 5** — Parent: live map, realtime subscription (fixing the known
