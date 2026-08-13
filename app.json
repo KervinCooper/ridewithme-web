@@ -25,7 +25,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "onthemuv uses your location while GO LIVE is on so parents and admin can see this vehicle move."
+        }
+      ]
     ]
   }
 }

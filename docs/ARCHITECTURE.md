@@ -30,7 +30,7 @@ Three concrete gaps drove the decision to restart on Expo/React Native:
 | Session storage | `expo-secure-store` (see note in `lib/supabase/secureStoreAdapter.ts` re: its ~2048-byte value cap) |
 | Client state | Zustand |
 | Maps | react-native-maps (native Google/Apple maps), replacing Leaflet |
-| Location | expo-location + expo-task-manager for background updates (requires an EAS dev build — Expo Go can't run a custom background task) |
+| Location | expo-location (foreground tracking shipped in Phase 3) + expo-task-manager for background updates, added in Phase 4 (requires an EAS dev build — Expo Go can't run a custom background task) |
 | Push | expo-notifications + Expo Push API, triggered by a Supabase Database Webhook / Edge Function |
 
 ## Auth & data model
@@ -154,8 +154,24 @@ create the driver/parent account and link it to a vehicle/student.
   entry); add one (Google Cloud Console → enable Maps SDK for Android →
   generate key) whenever Android map testing starts. iOS uses Apple Maps, no
   key needed.
-- **Phase 3** — Driver: manifest, status actions, SOS.
-- **Phase 4** — Background location wired to the `rides` upsert (EAS dev build).
+- **Phase 3 (done)** — Driver terminal (`app/driver/index.tsx`, resolves the
+  driver's vehicle via `vehicles.driver_id = auth.uid()`): manifest with the
+  same status-action state machine as the original (5-min warning → picked up
+  → dropped → undo), bulk shift reset, SOS toggle, and **foreground** GO LIVE
+  (`expo-location` `watchPositionAsync`, throttled to 3s/5m vs. the old
+  unthrottled web `watchPosition`, upserts into `rides` — stops the moment the
+  app backgrounds; **surviving backgrounding is Phase 4**). Day/night toggle
+  ported (real driver glare concern, not just aesthetic) but re-themed to use
+  the app's own `accent`/`bg`/`surface` tokens instead of the old one-off
+  `#CCFF00`/`#050505` literals, so the driver screen doesn't introduce a
+  second inconsistent brand color. Two intentional fixes, not silent parity:
+  the old "Auto-SMS dispatched"/"5 Min Warning sent" toast copy (which lied —
+  no message was ever sent, one of the three reasons for this whole rebuild)
+  is now honest about being a local status change; the old offline banner
+  ("...Saving Data Locally", also no such queueing existed) isn't ported at
+  all, deferred to Phase 4 where real offline write-queueing actually belongs.
+- **Phase 4** — Background location survival (EAS dev build) for the GO LIVE
+  flow Phase 3 already built, plus real offline write-queueing.
 - **Phase 5** — Parent: live map, realtime subscription (fixing the known
   join-drop bug from `BEHAVIOR.md`'s parent realtime handler #2 intentionally
   this time, not silently).
